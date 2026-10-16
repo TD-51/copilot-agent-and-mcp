@@ -38,6 +38,20 @@ Book Favorites is a full-stack web application that allows users to:
 
 ## Setup
 
+### Prerequisites
+
+- Install a supported Node.js LTS release.
+- The test scripts require Bash (for example, Git Bash on Windows).
+- On Windows ARM64, Cypress requires version 14.5.0 or later and runs through
+  x64 emulation. See the [Cypress system requirements](https://docs.cypress.io/app/get-started/install-cypress#System-requirements)
+  for supported Windows versions. This repository requires Cypress `^14.5.0`.
+
+If an older checkout fails during `npm install` with Cypress 14.4.1 and
+`Platform: win32-arm64`, update the checkout and run `npm install` again.
+The `inflight` and `glob` deprecation warnings are not the cause of that failure.
+If `EPERM` cleanup warnings persist, stop development servers or test processes
+using the affected dependencies, then retry the install.
+
 1. **Clone the repository:**
    ```bash
    git clone <repo-url>
