@@ -3,16 +3,21 @@ const express = require('express');
 const createApiRouter = require('../routes');
 const path = require('path');
 
-const app = express();
-app.use(express.json());
-app.use('/api', createApiRouter({
-  usersFile: path.join(__dirname, '../data/test-users.json'),
-  booksFile: path.join(__dirname, '../data/test-books.json'),
-  readJSON: (file) => require('fs').existsSync(file) ? JSON.parse(require('fs').readFileSync(file, 'utf-8')) : [],
-  writeJSON: (file, data) => require('fs').writeFileSync(file, JSON.stringify(data, null, 2)),
-  authenticateToken: (req, res, next) => next(),
-  SECRET_KEY: 'test_secret',
-}));
+function createTestApp() {
+  const app = express();
+  app.use(express.json());
+  app.use('/api', createApiRouter({
+    usersFile: path.join(__dirname, '../data/test-users.json'),
+    booksFile: path.join(__dirname, '../data/test-books.json'),
+    readJSON: (file) => require('fs').existsSync(file) ? JSON.parse(require('fs').readFileSync(file, 'utf-8')) : [],
+    writeJSON: (file, data) => require('fs').writeFileSync(file, JSON.stringify(data, null, 2)),
+    authenticateToken: (req, res, next) => next(),
+    SECRET_KEY: 'test_secret',
+  }));
+  return app;
+}
+
+const app = createTestApp();
 
 describe('Auth API', () => {
   const testUser = { username: 'testuser', password: 'testpass' };
@@ -49,5 +54,16 @@ describe('Auth API', () => {
   it('POST /api/login should fail with missing fields', async () => {
     const res = await request(app).post('/api/login').send({ username: '' });
     expect(res.statusCode).toBe(401);
+  });
+
+  it('POST /api/login should rate limit repeated attempts from one IP', async () => {
+    const rateLimitedApp = createTestApp();
+    for (let attempt = 0; attempt < 10; attempt += 1) {
+      const res = await request(rateLimitedApp).post('/api/login').send({ username: 'unknown', password: 'wrong' });
+      expect(res.statusCode).toBe(401);
+    }
+
+    const res = await request(rateLimitedApp).post('/api/login').send({ username: 'unknown', password: 'wrong' });
+    expect(res.statusCode).toBe(429);
   });
 });
