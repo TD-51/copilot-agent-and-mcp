@@ -111,4 +111,88 @@ describe('Favorites API', () => {
       .send({ bookId: '1' });
     expect(res.statusCode).toBe(401);
   });
+
+  describe('DELETE /api/favorites', () => {
+    it('should persist removal without changing other favorites or users', async () => {
+      const users = JSON.parse(fs.readFileSync(usersFile, 'utf-8'));
+      const sandra = users.find(u => u.username === 'sandra');
+      const bookId = sandra.favorites[0];
+      const expectedUsers = users.map(user => user.username === 'sandra'
+        ? { ...user, favorites: user.favorites.filter(id => id !== bookId) }
+        : user);
+
+      const res = await request(app)
+        .delete('/api/favorites')
+        .set('Authorization', 'Bearer ' + getToken())
+        .send({ bookId });
+      expect(res.statusCode).toBe(200);
+      expect(res.body.message).toMatch(/removed/);
+      expect(JSON.parse(fs.readFileSync(usersFile, 'utf-8'))).toEqual(expectedUsers);
+
+      const favorites = await request(app)
+        .get('/api/favorites')
+        .set('Authorization', 'Bearer ' + getToken());
+      expect(favorites.statusCode).toBe(200);
+      expect(favorites.body.map(book => book.id)).not.toContain(bookId);
+      expect(favorites.body.map(book => book.id).sort()).toEqual(
+        expectedUsers.find(user => user.username === 'sandra').favorites.slice().sort()
+      );
+
+      const repeated = await request(app)
+        .delete('/api/favorites')
+        .set('Authorization', 'Bearer ' + getToken())
+        .send({ bookId });
+      expect(repeated.statusCode).toBe(200);
+      expect(JSON.parse(fs.readFileSync(usersFile, 'utf-8'))).toEqual(expectedUsers);
+    });
+
+    it('should fail without auth and leave data unchanged', async () => {
+      const before = fs.readFileSync(usersFile, 'utf-8');
+      const res = await request(app).delete('/api/favorites').send({ bookId: '1' });
+      expect(res.statusCode).toBe(401);
+      expect(fs.readFileSync(usersFile, 'utf-8')).toBe(before);
+    });
+
+    it('should fail with invalid auth and leave data unchanged', async () => {
+      const before = fs.readFileSync(usersFile, 'utf-8');
+      const res = await request(app)
+        .delete('/api/favorites')
+        .set('Authorization', 'Bearer ' + 'invalid')
+        .send({ bookId: '1' });
+      expect(res.statusCode).toBe(403);
+      expect(fs.readFileSync(usersFile, 'utf-8')).toBe(before);
+    });
+
+    it.each([undefined, {}, { bookId: '' }])('should reject a missing bookId (%p)', async body => {
+      const before = fs.readFileSync(usersFile, 'utf-8');
+      const res = await request(app)
+        .delete('/api/favorites')
+        .set('Authorization', 'Bearer ' + getToken())
+        .send(body);
+      expect(res.statusCode).toBe(400);
+      expect(fs.readFileSync(usersFile, 'utf-8')).toBe(before);
+    });
+
+    it('should 404 for a non-existent user', async () => {
+      const before = fs.readFileSync(usersFile, 'utf-8');
+      const res = await request(app)
+        .delete('/api/favorites')
+        .set('Authorization', 'Bearer ' + getToken('nouser'))
+        .send({ bookId: '1' });
+      expect(res.statusCode).toBe(404);
+      expect(fs.readFileSync(usersFile, 'utf-8')).toBe(before);
+    });
+
+    it('should rate-limit repeated removal attempts without changing data', async () => {
+      const before = fs.readFileSync(usersFile, 'utf-8');
+      let res;
+      for (let i = 0; i < 61; i++) {
+        res = await request(app).delete('/api/favorites').send({ bookId: '1' });
+        if (res.statusCode === 429) break;
+        expect(res.statusCode).toBe(401);
+      }
+      expect(res.statusCode).toBe(429);
+      expect(fs.readFileSync(usersFile, 'utf-8')).toBe(before);
+    });
+  });
 });
