@@ -182,5 +182,17 @@ describe('Favorites API', () => {
       expect(res.statusCode).toBe(404);
       expect(fs.readFileSync(usersFile, 'utf-8')).toBe(before);
     });
+
+    it('should rate-limit repeated removal attempts without changing data', async () => {
+      const before = fs.readFileSync(usersFile, 'utf-8');
+      let res;
+      for (let i = 0; i < 61; i++) {
+        res = await request(app).delete('/api/favorites').send({ bookId: '1' });
+        if (res.statusCode === 429) break;
+        expect(res.statusCode).toBe(401);
+      }
+      expect(res.statusCode).toBe(429);
+      expect(fs.readFileSync(usersFile, 'utf-8')).toBe(before);
+    });
   });
 });
