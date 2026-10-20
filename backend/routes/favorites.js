@@ -1,9 +1,26 @@
 const express = require('express');
+const rateLimit = require('express-rate-limit').rateLimit;
 
-function createFavoritesRouter({ usersFile, booksFile, readJSON, writeJSON, authenticateToken }) {
+function createFavoritesRouter({
+  usersFile,
+  booksFile,
+  readJSON,
+  writeJSON,
+  authenticateToken,
+  favoritesRateLimitOptions,
+}) {
+  const rateLimitOptions = favoritesRateLimitOptions || {
+    windowMs: 15 * 60 * 1000,
+    limit: 100,
+    standardHeaders: true,
+    legacyHeaders: false,
+  };
   const router = express.Router();
 
-  router.get('/', authenticateToken, (req, res) => {
+  router.use(rateLimit(rateLimitOptions));
+  router.use(authenticateToken);
+
+  router.get('/', (req, res) => {
     const users = readJSON(usersFile);
     const user = users.find(u => u.username === req.user.username);
     if (!user) return res.status(404).json({ message: 'User not found' });
@@ -12,7 +29,7 @@ function createFavoritesRouter({ usersFile, booksFile, readJSON, writeJSON, auth
     res.json(favorites);
   });
 
-  router.post('/', authenticateToken, (req, res) => {
+  router.post('/', (req, res) => {
     const { bookId } = req.body;
     if (!bookId) return res.status(400).json({ message: 'Book ID required' });
     const users = readJSON(usersFile);
@@ -25,7 +42,7 @@ function createFavoritesRouter({ usersFile, booksFile, readJSON, writeJSON, auth
     res.status(200).json({ message: 'Book added to favorites' });
   });
 
-  router.delete('/', authenticateToken, (req, res) => {
+  router.delete('/', (req, res) => {
     try {
       const users = readJSON(usersFile);
       const user = users.find(u => u.username === req.user.username);

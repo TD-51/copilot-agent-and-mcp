@@ -14,6 +14,18 @@ function getToken(username = 'sandra') {
   return jwt.sign({ username }, SECRET_KEY, { expiresIn: '1h' });
 }
 
+function authenticateToken(req, res, next) {
+  const authHeader = req.headers['authorization'];
+  const token = authHeader && authHeader.split(' ')[1];
+  if (!token) return res.sendStatus(401);
+  try {
+    req.user = jwt.verify(token, SECRET_KEY);
+    next();
+  } catch {
+    return res.sendStatus(403);
+  }
+}
+
 const app = express();
 app.use(express.json());
 app.use('/api', createApiRouter({
@@ -21,17 +33,7 @@ app.use('/api', createApiRouter({
   booksFile,
   readJSON: (file) => fs.existsSync(file) ? JSON.parse(fs.readFileSync(file, 'utf-8')) : [],
   writeJSON: (file, data) => fs.writeFileSync(file, JSON.stringify(data, null, 2)),
-  authenticateToken: (req, res, next) => {
-    const authHeader = req.headers['authorization'];
-    const token = authHeader && authHeader.split(' ')[1];
-    if (!token) return res.sendStatus(401);
-    try {
-      req.user = jwt.verify(token, SECRET_KEY);
-      next();
-    } catch {
-      return res.sendStatus(403);
-    }
-  },
+  authenticateToken,
   SECRET_KEY,
 }));
 
@@ -136,5 +138,51 @@ describe('Favorites API', () => {
   it('DELETE /api/favorites should fail without auth', async () => {
     const res = await request(app).delete('/api/favorites');
     expect(res.statusCode).toBe(401);
+  });
+
+  it('favorites routes should rate limit requests before file operations', async () => {
+    const readJSON = jest.fn((file) => file === usersFile
+      ? [{ username: 'sandra', favorites: [] }]
+      : []);
+    const writeJSON = jest.fn();
+    const limitedApp = express();
+    limitedApp.use(express.json());
+    limitedApp.use('/api', createApiRouter({
+      usersFile,
+      booksFile,
+      readJSON,
+      writeJSON,
+      authenticateToken,
+      favoritesRateLimitOptions: { windowMs: 60_000, limit: 2 },
+    }));
+    const token = getToken('sandra');
+
+    const firstResponse = await request(limitedApp)
+      .get('/api/favorites')
+      .set('Authorization', 'Bearer ' + token);
+    expect(firstResponse.statusCode).toBe(200);
+    expect(readJSON).toHaveBeenCalledTimes(2);
+
+    const firstPostResponse = await request(limitedApp)
+      .post('/api/favorites')
+      .set('Authorization', 'Bearer ' + token)
+      .send({ bookId: 'book-1' });
+    expect(firstPostResponse.statusCode).toBe(200);
+    expect(readJSON).toHaveBeenCalledTimes(3);
+    expect(writeJSON).toHaveBeenCalledTimes(1);
+
+    const limitedResponse = await request(limitedApp)
+      .get('/api/favorites')
+      .set('Authorization', 'Bearer ' + token);
+    expect(limitedResponse.statusCode).toBe(429);
+    expect(readJSON).toHaveBeenCalledTimes(3);
+
+    const limitedPostResponse = await request(limitedApp)
+      .post('/api/favorites')
+      .set('Authorization', 'Bearer ' + token)
+      .send({ bookId: 'book-2' });
+    expect(limitedPostResponse.statusCode).toBe(429);
+    expect(readJSON).toHaveBeenCalledTimes(3);
+    expect(writeJSON).toHaveBeenCalledTimes(1);
   });
 });
