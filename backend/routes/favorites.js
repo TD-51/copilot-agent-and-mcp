@@ -1,9 +1,22 @@
 const express = require('express');
+const { rateLimit } = require('express-rate-limit');
 
-function createFavoritesRouter({ usersFile, booksFile, readJSON, writeJSON, authenticateToken }) {
+function createFavoritesRouter({
+  usersFile,
+  booksFile,
+  readJSON,
+  writeJSON,
+  authenticateToken,
+  favoritesRateLimit = rateLimit({
+    windowMs: 15 * 60 * 1000,
+    limit: 100,
+    standardHeaders: true,
+    legacyHeaders: false,
+  }),
+}) {
   const router = express.Router();
 
-  router.get('/', authenticateToken, (req, res) => {
+  router.get('/', authenticateToken, favoritesRateLimit, (req, res) => {
     const users = readJSON(usersFile);
     const user = users.find(u => u.username === req.user.username);
     if (!user) return res.status(404).json({ message: 'User not found' });
@@ -12,7 +25,7 @@ function createFavoritesRouter({ usersFile, booksFile, readJSON, writeJSON, auth
     res.json(favorites);
   });
 
-  router.post('/', authenticateToken, (req, res) => {
+  router.post('/', authenticateToken, favoritesRateLimit, (req, res) => {
     const { bookId } = req.body;
     if (!bookId) return res.status(400).json({ message: 'Book ID required' });
     const users = readJSON(usersFile);

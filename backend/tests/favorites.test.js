@@ -1,5 +1,6 @@
 const request = require('supertest');
 const express = require('express');
+const { rateLimit } = require('express-rate-limit');
 const createApiRouter = require('../routes');
 const path = require('path');
 
@@ -14,6 +15,18 @@ function getToken(username = 'sandra') {
   return jwt.sign({ username }, SECRET_KEY, { expiresIn: '1h' });
 }
 
+function authenticateToken(req, res, next) {
+  const authHeader = req.headers['authorization'];
+  const token = authHeader && authHeader.split(' ')[1];
+  if (!token) return res.sendStatus(401);
+  try {
+    req.user = jwt.verify(token, SECRET_KEY);
+    next();
+  } catch {
+    return res.sendStatus(403);
+  }
+}
+
 const app = express();
 app.use(express.json());
 app.use('/api', createApiRouter({
@@ -21,17 +34,7 @@ app.use('/api', createApiRouter({
   booksFile,
   readJSON: (file) => fs.existsSync(file) ? JSON.parse(fs.readFileSync(file, 'utf-8')) : [],
   writeJSON: (file, data) => fs.writeFileSync(file, JSON.stringify(data, null, 2)),
-  authenticateToken: (req, res, next) => {
-    const authHeader = req.headers['authorization'];
-    const token = authHeader && authHeader.split(' ')[1];
-    if (!token) return res.sendStatus(401);
-    try {
-      req.user = jwt.verify(token, SECRET_KEY);
-      next();
-    } catch {
-      return res.sendStatus(403);
-    }
-  },
+  authenticateToken,
   SECRET_KEY,
 }));
 
@@ -110,5 +113,34 @@ describe('Favorites API', () => {
       .post('/api/favorites')
       .send({ bookId: '1' });
     expect(res.statusCode).toBe(401);
+  });
+
+  it('GET /api/favorites should rate limit requests before reading files', async () => {
+    const readJSON = jest.fn((file) => file === usersFile
+      ? [{ username: 'sandra', favorites: [] }]
+      : []);
+    const limitedApp = express();
+    limitedApp.use(express.json());
+    limitedApp.use('/api', createApiRouter({
+      usersFile,
+      booksFile,
+      readJSON,
+      writeJSON: jest.fn(),
+      authenticateToken,
+      favoritesRateLimit: rateLimit({ windowMs: 60_000, limit: 1 }),
+    }));
+    const token = getToken('sandra');
+
+    const firstResponse = await request(limitedApp)
+      .get('/api/favorites')
+      .set('Authorization', 'Bearer ' + token);
+    expect(firstResponse.statusCode).toBe(200);
+    expect(readJSON).toHaveBeenCalledTimes(2);
+
+    const limitedResponse = await request(limitedApp)
+      .get('/api/favorites')
+      .set('Authorization', 'Bearer ' + token);
+    expect(limitedResponse.statusCode).toBe(429);
+    expect(readJSON).toHaveBeenCalledTimes(2);
   });
 });
