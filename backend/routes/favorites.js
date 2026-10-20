@@ -17,7 +17,10 @@ function createFavoritesRouter({
   };
   const router = express.Router();
 
-  router.get('/', authenticateToken, rateLimit(rateLimitOptions), (req, res) => {
+  router.use(authenticateToken);
+  router.use(rateLimit(rateLimitOptions));
+
+  router.get('/', (req, res) => {
     const users = readJSON(usersFile);
     const user = users.find(u => u.username === req.user.username);
     if (!user) return res.status(404).json({ message: 'User not found' });
@@ -26,7 +29,7 @@ function createFavoritesRouter({
     res.json(favorites);
   });
 
-  router.post('/', authenticateToken, rateLimit(rateLimitOptions), (req, res) => {
+  router.post('/', (req, res) => {
     const { bookId } = req.body;
     if (!bookId) return res.status(400).json({ message: 'Book ID required' });
     const users = readJSON(usersFile);

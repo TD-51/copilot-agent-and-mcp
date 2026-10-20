@@ -127,7 +127,7 @@ describe('Favorites API', () => {
       readJSON,
       writeJSON,
       authenticateToken,
-      favoritesRateLimitOptions: { windowMs: 60_000, limit: 1 },
+      favoritesRateLimitOptions: { windowMs: 60_000, limit: 2 },
     }));
     const token = getToken('sandra');
 
@@ -137,12 +137,6 @@ describe('Favorites API', () => {
     expect(firstResponse.statusCode).toBe(200);
     expect(readJSON).toHaveBeenCalledTimes(2);
 
-    const limitedResponse = await request(limitedApp)
-      .get('/api/favorites')
-      .set('Authorization', 'Bearer ' + token);
-    expect(limitedResponse.statusCode).toBe(429);
-    expect(readJSON).toHaveBeenCalledTimes(2);
-
     const firstPostResponse = await request(limitedApp)
       .post('/api/favorites')
       .set('Authorization', 'Bearer ' + token)
@@ -150,6 +144,12 @@ describe('Favorites API', () => {
     expect(firstPostResponse.statusCode).toBe(200);
     expect(readJSON).toHaveBeenCalledTimes(3);
     expect(writeJSON).toHaveBeenCalledTimes(1);
+
+    const limitedResponse = await request(limitedApp)
+      .get('/api/favorites')
+      .set('Authorization', 'Bearer ' + token);
+    expect(limitedResponse.statusCode).toBe(429);
+    expect(readJSON).toHaveBeenCalledTimes(3);
 
     const limitedPostResponse = await request(limitedApp)
       .post('/api/favorites')
