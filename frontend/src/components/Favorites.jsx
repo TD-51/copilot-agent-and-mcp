@@ -1,6 +1,6 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
-import { fetchFavorites } from '../store/favoritesSlice';
+import { fetchFavorites, removeFavorite } from '../store/favoritesSlice';
 import { useNavigate } from 'react-router-dom';
 
 const Favorites = () => {
@@ -9,6 +9,8 @@ const Favorites = () => {
   const status = useAppSelector(state => state.favorites.status);
   const token = useAppSelector(state => state.user.token);
   const navigate = useNavigate();
+  const [removingId, setRemovingId] = useState(null);
+  const [removeError, setRemoveError] = useState('');
 
   useEffect(() => {
     if (!token) {
@@ -18,12 +20,25 @@ const Favorites = () => {
     dispatch(fetchFavorites(token));
   }, [dispatch, token, navigate]);
 
+  const handleRemoveFavorite = async (bookId) => {
+    setRemovingId(bookId);
+    setRemoveError('');
+    try {
+      await dispatch(removeFavorite({ token, bookId })).unwrap();
+    } catch {
+      setRemoveError('Failed to remove favorite. Please try again.');
+    } finally {
+      setRemovingId(null);
+    }
+  };
+
   if (status === 'loading') return <div>Loading...</div>;
   if (status === 'failed') return <div>Failed to load favorites.</div>;
 
   return (
     <div>
       <h2>My Favorite Books</h2>
+      {removeError && <p role="alert">{removeError}</p>}
       {favorites.length === 0 ? (
         <div style={{
           background: '#fff',
@@ -45,6 +60,13 @@ const Favorites = () => {
           {favorites.map(book => (
             <li key={book.id}>
               <strong>{book.title}</strong> by {book.author}
+              <button
+                onClick={() => handleRemoveFavorite(book.id)}
+                disabled={removingId !== null}
+                aria-label={`Remove ${book.title} from favorites`}
+              >
+                {removingId === book.id ? 'Removing...' : 'Remove from Favorites'}
+              </button>
             </li>
           ))}
         </ul>

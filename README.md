@@ -8,7 +8,7 @@
 Book Favorites is a full-stack web application that allows users to:
 - Register for a new account or log in with existing credentials
 - Browse a curated list of 50 books
-- Add books from their personal favorites list
+- Add books to and remove books from their personal favorites list
 - View their favorite books in a dedicated section
 - Enjoy a clean, modern, and responsive user interface
 - Experience protected routes (only logged-in users can access book and favorites pages)
@@ -98,3 +98,4 @@ using the affected dependencies, then retry the install.
 6. **Usage:**
    - Register a new account or log in with an existing one (`sandra`/`sandra`)).
    - Browse books, add favorites, and enjoy the app!
+   - In Favorites, use "Remove from Favorites" to remove a book. Changes are saved automatically.
