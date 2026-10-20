@@ -8,6 +8,7 @@
 Book Favorites is a full-stack web application that allows users to:
 - Register for a new account or log in with existing credentials
 - Browse a curated list of 50 books
+- Sort books by title or author, A–Z or Z–A; the selection is kept when navigating within the app
 - Add books from their personal favorites list
 - View their favorite books in a dedicated section
 - Enjoy a clean, modern, and responsive user interface
@@ -28,6 +29,7 @@ Book Favorites is a full-stack web application that allows users to:
   - Data persistence using JSON files (`books.json` and `users.json`)
   - Modular route structure for authentication, books, and favorites
   - CORS enabled for frontend-backend communication
+  - `GET /api/books?sort=title&order=asc` sorts by `title` or `author`, with `asc` (default) or `desc` order, ignoring case. Without `sort`, the original list order is preserved; invalid sort fields or orders return HTTP 400.
 
 - **Other:**
   - Responsive design for desktop and mobile

@@ -1,7 +1,7 @@
 
 import React, { useEffect } from 'react';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
-import { fetchBooks } from '../store/booksSlice';
+import { fetchBooks, setSort } from '../store/booksSlice';
 import { addFavorite, fetchFavorites } from '../store/favoritesSlice';
 import { useNavigate } from 'react-router-dom';
 import styles from '../styles/BookList.module.css';
@@ -10,6 +10,8 @@ const BookList = () => {
   const dispatch = useAppDispatch();
   const books = useAppSelector(state => state.books.items);
   const status = useAppSelector(state => state.books.status);
+  const sort = useAppSelector(state => state.books.sort);
+  const order = useAppSelector(state => state.books.order);
   const token = useAppSelector(state => state.user.token);
   const navigate = useNavigate();
   const favorites = useAppSelector(state => state.favorites.items);
@@ -20,6 +22,10 @@ const BookList = () => {
       return;
     }
     dispatch(fetchBooks());
+  }, [dispatch, token, navigate, sort, order]);
+
+  useEffect(() => {
+    if (!token) return;
     dispatch(fetchFavorites(token));
   }, [dispatch, token, navigate]);
 
@@ -32,13 +38,26 @@ const BookList = () => {
     dispatch(fetchFavorites(token));
   };
 
-  if (status === 'loading') return <div>Loading...</div>;
-  if (status === 'failed') return <div>Failed to load books.</div>;
-
   return (
     <div>
       <h2>Books</h2>
-      {books.length === 0 ? (
+      <label htmlFor="book-sort">Sort books: </label>
+      <select
+        id="book-sort"
+        value={`${sort}-${order}`}
+        onChange={event => {
+          const [sort, order] = event.target.value.split('-');
+          dispatch(setSort({ sort, order }));
+        }}
+      >
+        <option value="title-asc">Title (A–Z)</option>
+        <option value="title-desc">Title (Z–A)</option>
+        <option value="author-asc">Author (A–Z)</option>
+        <option value="author-desc">Author (Z–A)</option>
+      </select>
+      {status === 'loading' ? <div role="status">Loading...</div> :
+        status === 'failed' ? <div role="alert">Failed to load books.</div> :
+        books.length === 0 ? (
         <div style={{
           background: '#fff',
           padding: '2rem',
