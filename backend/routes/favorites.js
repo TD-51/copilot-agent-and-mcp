@@ -17,8 +17,8 @@ function createFavoritesRouter({
   };
   const router = express.Router();
 
-  router.use(authenticateToken);
   router.use(rateLimit(rateLimitOptions));
+  router.use(authenticateToken);
 
   router.get('/', (req, res) => {
     const users = readJSON(usersFile);
