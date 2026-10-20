@@ -1,6 +1,6 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
-import { fetchFavorites } from '../store/favoritesSlice';
+import { fetchFavorites, clearFavorites } from '../store/favoritesSlice';
 import { useNavigate } from 'react-router-dom';
 
 const Favorites = () => {
@@ -9,6 +9,18 @@ const Favorites = () => {
   const status = useAppSelector(state => state.favorites.status);
   const token = useAppSelector(state => state.user.token);
   const navigate = useNavigate();
+
+  const [error, setError] = useState('');
+
+  const handleClearAll = async () => {
+    if (!window.confirm('Are you sure you want to clear all your favorite books?')) return;
+    setError('');
+    try {
+      await dispatch(clearFavorites(token)).unwrap();
+    } catch {
+      setError('Failed to clear favorites. Please try again.');
+    }
+  };
 
   useEffect(() => {
     if (!token) {
@@ -41,6 +53,9 @@ const Favorites = () => {
           </p>
         </div>
       ) : (
+        <>
+        <button id="clear-favorites" onClick={handleClearAll}>Clear All</button>
+        {error && <div role="alert" style={{ color: 'red' }}>{error}</div>}
         <ul>
           {favorites.map(book => (
             <li key={book.id}>
@@ -48,6 +63,7 @@ const Favorites = () => {
             </li>
           ))}
         </ul>
+        </>
       )}
     </div>
   );
