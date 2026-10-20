@@ -7,17 +7,17 @@ function createFavoritesRouter({
   readJSON,
   writeJSON,
   authenticateToken,
-  favoritesRateLimit,
+  favoritesRateLimitOptions,
 }) {
-  const limiter = favoritesRateLimit || rateLimit({
+  const rateLimitOptions = favoritesRateLimitOptions || {
     windowMs: 15 * 60 * 1000,
     limit: 100,
     standardHeaders: true,
     legacyHeaders: false,
-  });
+  };
   const router = express.Router();
 
-  router.get('/', authenticateToken, limiter, (req, res) => {
+  router.get('/', authenticateToken, rateLimit(rateLimitOptions), (req, res) => {
     const users = readJSON(usersFile);
     const user = users.find(u => u.username === req.user.username);
     if (!user) return res.status(404).json({ message: 'User not found' });
@@ -26,7 +26,7 @@ function createFavoritesRouter({
     res.json(favorites);
   });
 
-  router.post('/', authenticateToken, limiter, (req, res) => {
+  router.post('/', authenticateToken, rateLimit(rateLimitOptions), (req, res) => {
     const { bookId } = req.body;
     if (!bookId) return res.status(400).json({ message: 'Book ID required' });
     const users = readJSON(usersFile);

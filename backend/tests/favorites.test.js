@@ -1,6 +1,5 @@
 const request = require('supertest');
 const express = require('express');
-const { rateLimit } = require('express-rate-limit');
 const createApiRouter = require('../routes');
 const path = require('path');
 
@@ -115,19 +114,20 @@ describe('Favorites API', () => {
     expect(res.statusCode).toBe(401);
   });
 
-  it('GET /api/favorites should rate limit requests before reading files', async () => {
+  it('favorites routes should rate limit requests before file operations', async () => {
     const readJSON = jest.fn((file) => file === usersFile
       ? [{ username: 'sandra', favorites: [] }]
       : []);
+    const writeJSON = jest.fn();
     const limitedApp = express();
     limitedApp.use(express.json());
     limitedApp.use('/api', createApiRouter({
       usersFile,
       booksFile,
       readJSON,
-      writeJSON: jest.fn(),
+      writeJSON,
       authenticateToken,
-      favoritesRateLimit: rateLimit({ windowMs: 60_000, limit: 1 }),
+      favoritesRateLimitOptions: { windowMs: 60_000, limit: 1 },
     }));
     const token = getToken('sandra');
 
@@ -142,5 +142,21 @@ describe('Favorites API', () => {
       .set('Authorization', 'Bearer ' + token);
     expect(limitedResponse.statusCode).toBe(429);
     expect(readJSON).toHaveBeenCalledTimes(2);
+
+    const firstPostResponse = await request(limitedApp)
+      .post('/api/favorites')
+      .set('Authorization', 'Bearer ' + token)
+      .send({ bookId: 'book-1' });
+    expect(firstPostResponse.statusCode).toBe(200);
+    expect(readJSON).toHaveBeenCalledTimes(3);
+    expect(writeJSON).toHaveBeenCalledTimes(1);
+
+    const limitedPostResponse = await request(limitedApp)
+      .post('/api/favorites')
+      .set('Authorization', 'Bearer ' + token)
+      .send({ bookId: 'book-2' });
+    expect(limitedPostResponse.statusCode).toBe(429);
+    expect(readJSON).toHaveBeenCalledTimes(3);
+    expect(writeJSON).toHaveBeenCalledTimes(1);
   });
 });
